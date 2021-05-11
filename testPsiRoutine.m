@@ -24,15 +24,11 @@ bnds.guess   = 0.1;
 % true.lapse  = 0.05;
 % true.guess  = 0;
 
-% We represent attentional state as a function which 
-% starts low, rapidly attains a maximum, fluctuates,
-% and slowly increases over trial time.
-
 % Old FIXED mouse parameters
 % thresh.min = 0.08;
 % thresh.max = 0.2;
 % thresh.tau = 15;
-% 
+%
 % slope.min = 2;
 % slope.max = 4;
 % slope.tau = 15;
@@ -67,12 +63,12 @@ for mnum = 1:n_mice
       % When using fixed params defined above...
       %thresh.curve = getCurve(thresh, n_trials, 'down');
       %slope.curve  = getCurve(slope , n_trials, 'up');
-      
+
       % Params which are always fixed (as of now)
       lapse.curve  = getCurve(lapse.min, lapse.max, lapse.tau, n_trials, 'down');
       guess.curve  = getCurve(guess.min, guess.max, guess.tau, n_trials, 'down');
 
-      % 
+      %
       if mouse.day(day).slope.min == mouse.day(day).slope.max
          hist.posterior = zeros(40,1 ,n_trials);
       else
@@ -92,7 +88,7 @@ for mnum = 1:n_mice
 
       % Trial loop
       for t = t_beg:n_trials
-         % Data generating parameters            
+         % Data generating parameters
          true.thresh = thresh.curve(t);
          true.slope  = slope.curve(t);
          true.lapse  = lapse.curve(t);
@@ -135,7 +131,7 @@ for mnum = 1:n_mice
          subplot(3,2,2)
          plot(t_beg:n_trials, psi.intensities, '-o'); hold on;
          plot(1:n_trials, thresh.curve, '--')
-         ylim([0,0.5]) 
+         ylim([0,0.5])
          title('Stimulus Presentations')
          xlabel('Trial')
          ylabel('Intensity')
@@ -152,7 +148,7 @@ for mnum = 1:n_mice
          subplot(3,2,4)
          plot(1:n_trials, map_thresh, '-o'); hold on
          plot(1:n_trials, thresh.curve, '--')
-         ylim([0,0.5]) 
+         ylim([0,0.5])
          title('Threshold MAP Estimate')
          xlabel('Trial')
          ylabel('Estimate')
