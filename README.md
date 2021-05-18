@@ -18,7 +18,15 @@ Testing and parameter recovery code, as well as code to manually and randomly ge
 - The functions `get[Basic | Random]MouseMeta()` generate test "mice" for parameter recovery analysis.
 
 ## Other notes ##
-The slope estimation either has a bug, or is just very poorly constrained. The code as I recieved it had a severe bug in that component, which I fixed, so it is likely there is some additional error there. This doesn't appear to affect parameter recovery of threshold, so I haven't attempted to fix it yet.
+The Weibull CDF is given by
+
+![equation](https://latex.codecogs.com/svg.latex?p%20%3D%20%281-l-g%29%281-%5Ctext%7Bexp%7D%5E%7B-%5Cfrac%7Bx%7D%7Bt%7D%5Es%7D%29%29%20&plus;%20g)
+
+so that its slope at threshold is
+
+![equation](https://latex.codecogs.com/svg.latex?%5Cfrac%7Bdp%7D%7Bdx%7D%7C_%7Bx%7D%20%3D%20%281-l-g%29%5Cfrac%7Bs%7D%7Bt%7De%5E%7B-1%7D)
+
+The parameter s is estimated by the adaptive algorithm, and is called the "slope" parameter (although it is technically the "shape" parameter).
 
 The parameter recovery code seems to indicate that with moderate hardcoded guess and lapse rates, the model is fairly robust to mis-specification.
 
