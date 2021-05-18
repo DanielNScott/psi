@@ -5,7 +5,6 @@ classdef PsiRoutine < handle
       ss;
       tt;
       ll;
-      possible_intensities;
       nx;
       nt;
       ns;
@@ -21,6 +20,7 @@ classdef PsiRoutine < handle
       lapses
       guess
       %lapse
+      pints;
       pfunc
       nr_observations = 0;
    end
@@ -47,7 +47,7 @@ classdef PsiRoutine < handle
 
          % Set up the parameter space limits
          psi.threshs = exp( linspace(log(bnds.threshs(1)), log(bnds.threshs(2)), n_bins_threshs) );         
-         psi.slopes  = linspace(bnds.slopes(1), bnds.slopes(2), n_bins_slopes);
+         psi.slopes  = exp( linspace(log(bnds.slopes(1)) , log(bnds.slopes(2)) , n_bins_slopes ) );
          psi.lapses  = linspace(bnds.lapses(1), bnds.lapses(2), n_bins_lapses);
          
          %psi.lapses = lapse_rate;
@@ -75,20 +75,20 @@ classdef PsiRoutine < handle
          %p_theta = ones(length(psi.threshs),length(psi.slopes),length(psi.lapses));
          
          psi.posterior = p_theta;
-         psi.possible_intensities = linspace(0.01,0.5,50);
+         psi.pints = linspace(0.01,0.5,50);
          
          % Number of intensities, thresholds, slopes, lapses
-         psi.nx = length(psi.possible_intensities);
+         psi.nx = length(psi.pints);
          psi.nt = length(psi.threshs);
          psi.ns = length(psi.slopes);
          psi.nl = length(psi.lapses);
          
          % Grid of 
          [psi.tt, psi.ss, psi.ll, psi.xx] = ...
-            ndgrid(psi.threshs, psi.slopes, psi.lapses, psi.possible_intensities);
+            ndgrid(psi.threshs, psi.slopes, psi.lapses, psi.pints);
          
          % 
-         psi.pfunc = psi.weibull(psi.xx, psi.tt, psi.ss, psi.ll);
+         psi.pfunc = psi.weibull(psi.xx, psi.tt, psi.ss, psi.ll, psi.guess);
       end
       
       
@@ -102,13 +102,12 @@ classdef PsiRoutine < handle
          [~,min_idx] = min(entropy);
          
          % Return the stimulus to present
-         res = psi.possible_intensities(min_idx);
+         res = psi.pints(min_idx);
       end
       
       
       % Function for updating the posterior probability of the parameters
-      function res = updatePosterior(psi, x, r, reg)
-         
+      function res = updatePosterior(psi, x, r, reg, fget)         
          % Save the intensity and response
          psi.intensities = [psi.intensities, x];
          psi.responses   = [psi.responses  , r];
@@ -120,16 +119,36 @@ classdef PsiRoutine < handle
          [t,s,l] = ndgrid(psi.threshs, psi.slopes, psi.lapses);
          
          % Determine the likelihood of this response under each parameter set
-         likelihood = psi.weibull(x,t,s,l);
+         likelihood = psi.weibull(x,t,s,l,psi.guess);
          if(~r)
             likelihood = 1-likelihood;
          end
          
          % Update the posterior distribution
          % Note the regularization, so that this is not strictly Bayes.
-         post = reg*psi.posterior + (1-reg)*(psi.posterior.*likelihood);
-         psi.posterior = post./sum(post(:));
+         post = (reg*psi.posterior + (1-reg)*(psi.posterior.*likelihood));
+         post = post./sum(post(:));
          
+         psi.posterior = post;
+
+         %likelihood = likelihood./sum(likelihood(:));
+         %aug = post*(1-fget) + fget*likelihood;
+         
+         %psi.posterior = aug./sum(aug(:));
+         
+%          figure()
+%          subplot(1,3,1)
+%          imagesc(likelihood)
+%          colorbar()
+%          
+%          subplot(1,3,2)
+%          imagesc(post)
+%          colorbar()
+%          
+%          subplot(1,3,3)
+%          imagesc(psi.posterior)
+%          colorbar()
+
          % Return
          res = psi;
       end
@@ -150,8 +169,8 @@ classdef PsiRoutine < handle
       end
       
       % Weibull function with given parameters
-      function p = weibull(psi, x, t, s, l)
-         p = psi.guess + (1-l-psi.guess).*(1-exp(-(x./t).^s));
+      function p = weibull(psi, x, t, s, l, g)
+         p = g + (1-l-g).*(1-exp(-(x./t).^s));
       end   
       
       % Function for querying an observer with a known PF (for testing purposes)

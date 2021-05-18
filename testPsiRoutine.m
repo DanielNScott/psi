@@ -1,20 +1,29 @@
 close all;
 
 % Plot
-plots_on = 0;
+plots_on = 1;
 
 % Number of days to run, trials per day, mice
-n_mice = 20;
-n_days = 10;
+n_mice = 1;
+n_days = 6;
 n_trials = 50;
 
-% Regularization parameter for "Bayes" updates
+% Regularization parameter for "Bayes" updates (0 = full bayes, 1 = no updates)
 reg = 0.5;
+
+% Forgetting parameter for helping deal with non-stationarity
+fget = 0.00;
+
+% Fraction catch trials
+ct_mix = 0.0;
+
+% In-mixture from method of constant stimuli
+cs_mix = 0.0;
 
 % Parameter grid bounds for the presentation
 % algorithm. These are NOT mouse parameters.
-bnds.threshs = [0.005, 0.5];
-bnds.slopes  = [1,6];
+bnds.threshs = [0.005, 0.5]; %[0.005, 0.5];
+bnds.slopes  = [1,9];
 bnds.lapses  = [0.1,0.1];
 bnds.guess   = 0.1;
 
@@ -36,6 +45,7 @@ bnds.guess   = 0.1;
 for mnum = 1:n_mice
 
    % New changing-by-day mouse parameters
+   %mouse = getBasicMouseMeta();
    mouse = getRandMouseMeta();
    mouse = getMouse(n_days, n_trials, mouse);
 
@@ -48,7 +58,7 @@ for mnum = 1:n_mice
    priors.sd_thresh = 1.0;
 
    priors.mu_slope = 3.0;
-   priors.sd_slope = 1.0;
+   priors.sd_slope = 2.0;
 
    priors.a_lapse = 1;
    priors.b_lapse = 1;
@@ -69,7 +79,11 @@ for mnum = 1:n_mice
       guess.curve  = getCurve(guess.min, guess.max, guess.tau, n_trials, 'down');
 
       %
-      if mouse.day(day).slope.min == mouse.day(day).slope.max
+      const_slope  = bnds.slopes(1)  == bnds.slopes(2);
+      const_thresh = bnds.threshs(1) == bnds.threshs(2);
+      %const_slope  = mouse.day(day).slope.min  == mouse.day(day).slope.max;
+      %const_thresh = mouse.day(day).thresh.min == mouse.day(day).thresh.max;
+      if const_slope || const_thresh
          hist.posterior = zeros(40,1 ,n_trials);
       else
          hist.posterior = zeros(40,40,n_trials);
@@ -79,11 +93,14 @@ for mnum = 1:n_mice
          psi = PsiRoutine(bnds.guess, bnds, priors);
          hist.posterior(:,:,1) = psi.posterior;
          t_beg = 2;
+         clist = psi.threshs(1:5:end);
+         ccounts = zeros(1,length(clist));
       else
          psi.intensities = [];
          psi.responses = [];
          psi.nr_observations = 0;
          t_beg = 1;
+         ccounts = zeros(1,length(clist));
       end
 
       % Trial loop
@@ -95,13 +112,31 @@ for mnum = 1:n_mice
          true.guess  = guess.curve(t);
 
          % Get another stimulus
-         x = psi.suggestIntensity();
+         rnum = rand();
+         if rnum < ct_mix
+            % Catch trial
+            x = bnds.threshs(1);
+            
+         elseif rnum < ct_mix + cs_mix
+            % Random stimulus from under-presented 
+            % method of constant stimuli stims
+            inds = find(ccounts == min(ccounts));
+            inds = inds(randperm(length(inds)));
+            x = clist(inds(1));
+            
+         else
+            % Maximum entropy reduction suggestion
+            x = psi.suggestIntensity(); 
+            
+         end
+            
+         
 
          % Get a response
          r = psi.queryObserver(x, true.thresh, true.slope, true.lapse, true.guess);
 
          % Update the psi posterior densities
-         psi = psi.updatePosterior(x,r,reg);
+         psi = psi.updatePosterior(x,r,reg, fget);
 
          % Save the posterior
          hist.posterior(:,:,t) = psi.posterior;
@@ -116,9 +151,10 @@ for mnum = 1:n_mice
 
       if plots_on
          figure();
-         set(gcf,'Position', [95         141        1058         833])
+         set(gcf,'Position', [95, 42, 1666, 876])
 
-         subplot(3,2,1)
+         % Threshold estimates
+         subplot(3,4,1)
          plot(psi.threshs, mean(hist.posterior(:,:,  1),2), '-o'); hold on;
          plot(psi.threshs, mean(hist.posterior(:,:,end),2), '-o')
          ylims = ylim();
@@ -127,25 +163,16 @@ for mnum = 1:n_mice
          title('Threshold Posterior Densities')
          xlabel('Threshold')
          ylabel('Density')
-
-         subplot(3,2,2)
-         plot(t_beg:n_trials, psi.intensities, '-o'); hold on;
-         plot(1:n_trials, thresh.curve, '--')
-         ylim([0,0.5])
-         title('Stimulus Presentations')
-         xlabel('Trial')
-         ylabel('Intensity')
-         grid on
-
-         subplot(3,2,3)
+         
+         subplot(3,4,2)
          imagesc(squeeze(mean(hist.posterior(:,:,:),2)))
          yticklabels(round(psi.threshs(yticks),4))
          xlabel('Trial')
          ylabel('Threshold')
          title('Posterior Threshold Density')
          grid on
-
-         subplot(3,2,4)
+         
+         subplot(3,4,3)
          plot(1:n_trials, map_thresh, '-o'); hold on
          plot(1:n_trials, thresh.curve, '--')
          ylim([0,0.5])
@@ -154,7 +181,18 @@ for mnum = 1:n_mice
          ylabel('Estimate')
          grid on
 
-         subplot(3,2,5)
+         % Slope estimates
+         subplot(3,4,5)
+         plot(psi.slopes, mean(hist.posterior(:,:,  1),1), '-o'); hold on;
+         plot(psi.slopes, mean(hist.posterior(:,:,end),1), '-o')
+         ylims = ylim();
+         plot([true.slope, true.slope], ylims, '--k', 'LineWidth', 2);
+         grid on
+         title('Slope Posterior Densities')
+         xlabel('Slope')
+         ylabel('Density')
+         
+         subplot(3,4,6)
          imagesc(squeeze(mean(hist.posterior(:,:,:),1)))
          yticks(5:5:40)
          yticklabels(round(psi.slopes(yticks),4))
@@ -163,7 +201,7 @@ for mnum = 1:n_mice
          title('Posterior Slope Density')
          grid on
 
-         subplot(3,2,6)
+         subplot(3,4,7)
          plot(1:n_trials, map_slope, '-o'); hold on
          plot(1:n_trials, slope.curve, '--')
          ylim([0,6])
@@ -172,8 +210,43 @@ for mnum = 1:n_mice
          ylabel('Estimate')
          grid on
 
+         % Misc
+         
+         subplot(3,4,4)
+         plot(t_beg:n_trials, psi.intensities, '-o'); hold on;
+         plot(1:n_trials, thresh.curve, '--')
+         ylim([0,0.5])
+         title('Stimulus Presentations')
+         xlabel('Trial')
+         ylabel('Intensity')
+         grid on
+         
+         sind = floor(find(hist.posterior(:,:,n_trials) == max(max(hist.posterior(:,:,n_trials))))/40)+1;
+         tind = mod(find(hist.posterior(:,:,n_trials) == max(max(hist.posterior(:,:,n_trials)))),40);
+
+         subplot(3,4,8)
+         plot(psi.pints, squeeze(psi.pfunc(tind,sind,1,:)), '-o')
+         hold on; 
+         plot(psi.pints, psi.weibull(psi.pints, true.thresh, true.slope, true.lapse, true.guess), 'r--');
+         ylim([0,1])
+         grid on
+         title('MAP Psychometric Function')
+         legend({'Est', 'True'}, 'Location', 'SouthEast')
+         
+         subplot(3,4,9)
+         imagesc(hist.posterior(:,:,1))
+         title('Initial Posterior')
+         xlabel('Thresh')
+         ylabel('Slope')
+         
+         subplot(3,4,10)
+         imagesc(hist.posterior(:,:,n_trials))
+         title('Final Posterior')
+         xlabel('Thresh')
+         ylabel('Slope')
          suptitle(['\bf{Day ' num2str(day) ' Simulation Data}'])
          drawnow()
+
       end
    end
 end

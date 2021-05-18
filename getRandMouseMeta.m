@@ -1,12 +1,12 @@
 function mouse = getRandMouseMeta()
 
    % Fixed parameters
-   mouse.fixed.lapse.min = 0.1;
-   mouse.fixed.lapse.max = 0.1;
+   mouse.fixed.lapse.min = 0.05;
+   mouse.fixed.lapse.max = 0.05;
    mouse.fixed.lapse.tau = 2;
 
-   mouse.fixed.guess.min = 0.1;
-   mouse.fixed.guess.max = 0.1;
+   mouse.fixed.guess.min = 0.15;
+   mouse.fixed.guess.max = 0.15;
    mouse.fixed.guess.tau = 2;
    
    % Parameters govorning by-day learning
